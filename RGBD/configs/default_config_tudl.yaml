@@ -1,0 +1,203 @@
+# Configuration for YCBV dataset — DINOv2 dense feature patch matching
+# Based on ycbv_dino_patch.yaml; patch-level encoder replaced with DINOv2 dense features
+# (estimate_ycbv_poses_dino_patch_cached.py)
+#
+# This variant adds single-pass template-cache settings (see bottom of file).
+
+# ========================================
+# Dataset Configuration
+# ========================================
+dataset_root: /path/to/your/BOP/<dataset>/  # ← point this at your BOP dataset (download: bop.felk.cvut.cz/datasets)
+obj_id: 1
+templates_dir: /path/to/your/BOP/<dataset>/new_templates/level2_icosphere/  # ← see template_generation/
+
+dinov3_repo_dir: /path/to/your/dinov3  # ← clone facebookresearch/dinov3 and point this here
+
+segmentation_model: "cnos"
+
+# CNOS mask selection
+# Score threshold: only masks at or above this score are considered.
+# If no mask passes the threshold, the single highest-scoring mask is used as fallback.
+cnos_score_threshold: 0.2
+# How many masks to use per image (all masks that pass the threshold are candidates):
+#   integer → take the top-N scoring masks that pass the threshold
+#   "all"   → take every mask that passes the threshold
+cnos_num_masks: "2"
+
+use_saved_high_level_embeddings: false
+
+# Background attenuation for high-level query encoding.
+high_level_bg_weight: 1.0
+
+# Background attenuation for patch-level query encoding (DINOv2 grid-cell features).
+patch_bg_weight: 1.0
+
+# Use patch-level features with masked average pooling
+high_level_use_patch_features: true
+
+# Use attention-weighted pooling instead of uniform averaging
+high_level_use_attention_weighting: false
+
+# ========================================
+# High-Level Encoding & Search Options
+# ========================================
+num_high_level_nearest_templates_to_search_for: 1000
+num_high_level_nearest_templates_to_use: 100
+min_rot_dist_between_high_level_neighbors: 20
+inplane_rotation_angle: 30
+
+# ========================================
+# Patch Extraction and Correspondence
+# ========================================
+num_patch_neighbors_to_search_for: 3
+num_patch_neighbors_to_use: 3
+use_mutual_nearest_neighbor: true
+
+# ========================================
+# RANSAC Options
+# ========================================
+num_ransac_hypotheses: 10
+num_ransac_iterations: 45000
+ransac_inlier_threshold: 12.0
+min_rot_dist_between_hypotheses: 15
+# Feature-aware RANSAC sampling: weight minimal-set draws by KNN feature similarity.
+# Higher-similarity correspondences are sampled more often → better hypotheses faster.
+# true = weighted sampling (recommended), false = uniform (original behaviour)
+ransac_feature_aware_sampling: false
+
+# Depth-consistency reweighting: after the first RANSAC-Horn pass, reweight
+# correspondences by how well their projected depth matches the measured depth,
+# then run a second RANSAC-Horn pass on the updated weights.
+# true = enabled (recommended), false = single-pass behaviour
+depth_consistency_reweighting: false
+
+# # Pose-guided re-correspondence: after the depth-consistency second pass, project
+# # each template 3D point through the best pose, find the nearest query grid-cell,
+# # filter by cosine similarity, and run a final RANSAC-Horn on the new correspondences.
+pose_guided_re_correspondence: true
+pose_guided_sim_threshold: 0.5      # Minimum cosine similarity to accept a match
+pose_guided_max_spatial_dist: 16.0  # Max pixel distance: projected pt → query grid-cell
+
+# ========================================
+# Visualization Options
+# ========================================
+# Uncomment any you want to enable:
+visualizations:
+  - no_visualization
+  # - visualize_high_level_nn
+  # - visualize_pose_ests
+  # - visualize_correspondences
+  # - visualize_nearest_neighbors
+  # - visualize_correlation        # Shows correlation-based refinement heatmaps
+  - visualize_final_icp
+  - visualize_hypothesis_selection
+  - visualize_horn_poses
+  - visualize_megapose_poses
+  # - visualize_pose_alignment_3d
+
+refinements:
+  - rgb_megapose        # RGB-only MegaPose refiner (faster, no depth needed)
+  # - rgbd_megapose     # RGBD MegaPose refiner (uses depth; comment rgb_megapose when using this)
+  # - megapose_icp
+  - o3d_icp
+
+# ========================================
+# Per-Hypothesis Depth Refinement
+# ========================================
+# Options: "icp" (model-to-scene Open3D ICP), "teaserpp" (render-based Teaser++)
+depth_refiner: "teaserpp"
+
+# Teaser++ parameters (only used when depth_refiner: "teaserpp")
+teaserpp_noise_bound: 0.015    # metres (auto-scaled to mm when depth is in mm)
+teaserpp_n_points: 1000         # max correspondences after subsampling
+teaserpp_n_min_points: 50      # minimum overlap pixels to attempt refinement
+teaserpp_min_inliers: 30       # minimum inliers to accept the refined pose
+teaserpp_use_fps: false        # true = farthest-point sampling (requires working pytorch3d), false = random
+
+# ========================================
+# Logging Options
+# ========================================
+log_estimates_csv: false
+results_dir: ./results/cnos_dino_patch
+
+# ========================================
+# DINO Backbone
+# ========================================
+dino_highlevel_model: "dinov3_vitl16"
+# dino_highlevel_model: "dinov2_vitl14"
+
+# ========================================
+# High-Level Encoder Layer Selection
+# ========================================
+# Block index (0-based) for high-level encoding intermediate layer extraction.
+# If unset (commented out), uses final-layer output (current behaviour).
+# dino_highlevel_intermediate_layer_idx: 18
+
+# ========================================
+# DINOv2 Dense Patch Layer Selection
+# ========================================
+# true  → intermediate layer (recommended, FoundPose: +14.1 AR on BOP vs last layer)
+# false → last layer (x_norm_patchtokens) — original behaviour
+dino_patch_use_intermediate_layer: true
+# Block index (0-based). ViT-L has 24 blocks; block 18 = ~75% depth (FoundPose recommendation).
+# For ViT-B (12 blocks) try 8 or 9. Sweep: 14, 16, 18, 20 for ViT-L.
+dino_patch_intermediate_layer_idx: 18
+
+# ========================================
+# Speedup Options
+# ========================================
+use_vectorized_correspondences: true
+use_faiss_patch_nn: true
+
+# ========================================
+# Geometric Template Re-Ranking (Additions 8+9)
+# ========================================
+# Addition 8: depth centroid t_init = mean(backproject(raw_depth[mask>0], K)) — trivial,
+#   used only as translation prior for Addition 9.
+# Addition 9: re-rank the raw appearance KNN by fusing appearance score with geometric IoU.
+#   Projects CAD model silhouette using template R + t_init, computes IoU with query mask.
+#   score = (appearance + alpha * geo_iou * visibility) / (1 + visibility)  [SAM-6D formula]
+#   Set to false to use appearance-only KNN (original behaviour).
+use_geometric_template_reranking: false
+geo_reranking_alpha: 0.5      # Weight of geometric IoU term (0 = appearance only)
+geo_reranking_proj_radius: 3  # Dilation radius (px) for projected silhouette rendering
+
+# ========================================
+# Other Options
+# ========================================
+calc_geo_distances: false
+
+# Mask erosion kernel size for depth sampling (IDEA-F).
+# Erodes the query mask before depth validity filtering to discard grid cells
+# near the boundary where depth is unreliable (depth discontinuities).
+# 7 = erodes ~3px boundary strip. Set to 0 to disable (original behaviour).
+mask_erosion_kernel_size: 0
+
+# ========================================
+# Template cache (single-pass) settings
+# ========================================
+
+# Layer index for global template embedding in single-pass mode.
+# Default: last block (23 for ViT-L/16, 11 for ViT-B/16).
+# Set to same as dino_patch_intermediate_layer_idx to share features.
+dino_global_layer_idx: 23
+
+# Apply model.norm() (final LayerNorm) to patch features before storing.
+# false = raw pre-norm activations (current behavior, typically better for cosine sim)
+dino_patch_apply_norm: false
+
+# Apply model.norm() (final LayerNorm) to global embedding features before pooling.
+# false = raw pre-norm activations
+dino_global_apply_norm: false
+
+# ========================================
+# Debug filters (bop_inference.py only)
+# ========================================
+# All four are optional and unset by default — a normal run processes every
+# scene/image in the test split. Uncomment to debug a specific image, or to
+# resume an interrupted run partway through.
+#
+# debug_only_scene_id: 57      # process only this scene_id
+# debug_only_img_id: 24        # process only this img_id (combine with scene_id for one image)
+# debug_resume_scene_id: 57    # skip everything before this (scene_id, img_id)...
+# debug_resume_img_id: 219     # ...then process it and everything after, normally 

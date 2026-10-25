@@ -1,0 +1,193 @@
+# Configuration for TUDL dataset — RGB-only DINOv2 dense feature patch matching
+# Port of ycbv_dino_patch_v22.yaml to RGB-only mode.
+#
+# Key differences from RGBD version:
+#   - Query depth is NOT used for correspondence building
+#   - Horn's method (3D-3D) replaced by PnP (2D-3D)
+#   - Depth-consistency reweighting disabled (no query depth)
+#   - ICP / Teaser++ depth refinement disabled
+#   - Hypothesis scoring uses RGB appearance only (score_weight_depth: 0.0)
+#
+# Use with: cache_v2_rgb.py (PatchCorrespondenceRGB)
+
+# ========================================
+# Dataset Configuration
+# ========================================
+dataset_root: /path/to/your/BOP/<dataset>/  # ← point this at your BOP dataset (download: bop.felk.cvut.cz/datasets)
+obj_id: 1
+templates_dir: /path/to/your/BOP/<dataset>/new_templates/level2_icosphere/  # ← see template_generation/
+
+dinov3_repo_dir: /path/to/your/dinov3  # ← clone facebookresearch/dinov3 and point this here
+
+segmentation_model: "cnos"
+
+# CNOS mask selection
+cnos_score_threshold: 0.25
+cnos_num_masks: 1
+
+use_saved_high_level_embeddings: false
+
+# Background attenuation for high-level query encoding
+high_level_bg_weight: 1.0
+
+# Background attenuation for patch-level query encoding
+patch_bg_weight: 1.0
+
+# Use patch-level features with masked average pooling
+high_level_use_patch_features: true
+
+# Use attention-weighted pooling instead of uniform averaging
+high_level_use_attention_weighting: false
+
+# ========================================
+# High-Level Encoding & Search Options
+# ========================================
+num_high_level_nearest_templates_to_search_for: 500
+num_high_level_nearest_templates_to_use: 125
+min_rot_dist_between_high_level_neighbors: 20
+inplane_rotation_angle: 30
+
+# ========================================
+# Patch Extraction and Correspondence
+# ========================================
+num_patch_neighbors_to_search_for: 3
+num_patch_neighbors_to_use: 1
+use_mutual_nearest_neighbor: true
+
+use_pearson_refinement: true
+pearson_refinement_patch_size: 16
+pearson_refinement_search_range: 4
+pearson_use_gpu: true
+pearson_use_hist_match: false
+
+# Apply CLAHE (luminance normalisation) to each image crop before DINOv2 encoding.
+# Reduces the real/synthetic luminance gap at the feature level.
+# Requires rebuilding the template cache when toggled.
+dino_input_clahe: false
+
+# Instances where BOTH baseline and Pearson trans error exceed this are
+# treated as wrong-mask detections and excluded from the stats CSV.
+bad_mask_trans_threshold_mm: 500.0
+
+# ========================================
+# RANSAC-PnP Options
+# ========================================
+num_ransac_hypotheses: 10
+num_ransac_iterations: 1000
+# PnP inlier threshold in pixels (replaces ransac_inlier_threshold in mm)
+pnp_reprojection_threshold: 5.0
+# Keep mm threshold for any legacy code paths (not used in PnP path)
+ransac_inlier_threshold: 12.0
+min_rot_dist_between_hypotheses: 15
+ransac_feature_aware_sampling: false
+
+# Soft inlier scoring: geometry weight alpha in [0, 1].
+# 1.0 = pure geometric soft score (smooth reprojection decay, no visual term).
+# 0.7 = geometry dominates; visual quality modulates each match's contribution.
+# 0.0 = pure visual quality (not recommended).
+soft_score_alpha: 1.0
+
+# Depth-consistency reweighting: disabled — no query depth in RGB mode
+depth_consistency_reweighting: false
+
+# Pose-guided re-correspondence: project template 3D points through best pose,
+# find nearest query grid-cells, filter by cosine similarity, run second PnP pass.
+# Works in RGB mode: targets are 2D pixel coordinates (no depth backprojection).
+pose_guided_re_correspondence: true
+pose_guided_sim_threshold: 0.5
+pose_guided_max_spatial_dist: 16.0
+
+# ========================================
+# Visualization Options
+# ========================================
+visualizations:
+  - no_visualization
+  # # - visualize_high_level_nn
+  # # - visualize_pose_ests
+  # # - visualize_correspondences
+  # # - visualize_nearest_neighbors
+  - visualize_final_icp
+  # - visualize_hypothesis_selection
+  # - visualize_initial_pnp_poses
+  # - visualize_megapose_poses
+  # - visualize_pgrc_poses
+
+# ========================================
+# Refinements
+# ========================================
+refinements:
+  - rgb_megapose        # RGB-only MegaPose refiner — compatible with RGB mode
+  # - rgbd_megapose     # Requires depth — do NOT use in RGB mode
+  # - o3d_icp           # Requires depth point cloud — do NOT use in RGB mode
+
+# ========================================
+# Depth Refinement — DISABLED for RGB mode
+# ========================================
+# No per-hypothesis depth refinement. Pose passes through unchanged.
+depth_refiner: "none"
+
+# ========================================
+# Hypothesis Scoring Weights
+# ========================================
+# In RGB mode: depth and chamfer scoring disabled (require valid depth).
+# Scoring uses cosine similarity + IoU (z-score normalised before combining).
+score_weight_cosine: 0.2
+score_weight_iou: 0.5
+score_weight_chamfer: 0.0
+score_weight_depth: 0.0
+score_weight_cnos: 0.3
+
+# ========================================
+# Geometric Template Re-Ranking — DISABLED
+# ========================================
+# Depth centroid unavailable without valid query depth.
+use_geometric_template_reranking: false
+geo_reranking_alpha: 0.5
+geo_reranking_proj_radius: 3
+
+# ========================================
+# Logging Options
+# ========================================
+log_estimates_csv: false
+results_dir: ./results/tmp_test_timing
+
+# ========================================
+# Patch-Level Encoder
+# ========================================
+dino_highlevel_model: "dinov3_vitl16"
+dino_patch_model: "dinov3_vitl16"
+
+# ========================================
+# DINOv2 Dense Patch Layer Selection
+# ========================================
+dino_patch_use_intermediate_layer: true
+dino_patch_intermediate_layer_idx: 18
+
+# ========================================
+# Speedup Options
+# ========================================
+use_vectorized_correspondences: true
+use_faiss_patch_nn: true
+
+# ========================================
+# Render Re-Correspondence
+# ========================================
+# Render 10 axis-aligned rotation variants of the initial PnP pose, encode with
+# the same DINOv2, match query patches against the combined render embeddings,
+# run one RANSAC-PnP. Runs before MegaPose to improve the initial estimate.
+render_re_correspondence: true
+
+# ========================================
+# Other Options
+# ========================================
+calc_geo_distances: false
+
+# Mask erosion for depth sampling: disabled (no depth boundary protection needed)
+mask_erosion_kernel_size: 0
+
+# ========================================
+# cache_v2.py single-pass settings
+# ========================================
+cache_v2_global_layer_idx: 18
+cache_v2_patch_apply_norm: false
+cache_v2_global_apply_norm: false

@@ -1,0 +1,6 @@
+[submodule "cnos"]
+	path = cnos
+	url = https://github.com/Ali-Rafiaei/cnos.git
+[submodule "megapose"]
+	path = megapose
+	url = https://github.com/Ali-Rafiaei/megapose6d.git

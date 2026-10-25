@@ -1,0 +1,39 @@
+MIT License
+
+Copyright (c) 2026 Ali Rafiaei
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+This repository depends on third-party components not covered by the above:
+
+- cnos/ (git submodule, our fork): MIT License, Copyright (c) 2023 Van Nguyen Nguyen.
+- megapose/ (git submodule, our fork): Apache License 2.0, Copyright (c) 2022
+  Inria & NVIDIA CORPORATION & AFFILIATES. Our modifications are noted in that
+  submodule's own commit history.
+- DINOv3 (facebookresearch/dinov3, cloned separately, not vendored): subject
+  to Meta's own DINO license - a custom, non-OSI license, not MIT/Apache/BSD.
+  Read it before using DINOv3: it requires acknowledging DINO use in any
+  publication and including its full text if you redistribute DINO materials
+  or derivatives. See dinov3_repo_dir in the configs.
+- BlenderProc (DLR-RM/BlenderProc, invoked as an external tool via
+  `blenderproc run ...`, never imported into this code): GPL-3.0. Used only
+  for offline template rendering; not linked into or distributed with this
+  repository.

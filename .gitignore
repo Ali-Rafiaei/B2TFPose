@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Local caches, results, and downloaded data — never part of the release
+data/
+results*/
+*_results/
+timing_results/
+
+# Model/template checkpoints — documented as separate downloads, not committed
+*.pth
+*.pth.tar
+*.ckpt

@@ -1,0 +1,115 @@
+# B2TF RGBD Live Demo Server — configuration
+# Based on demo.yaml; visualizations disabled to prevent plt.show() blocking the server.
+# Fill in camera_intrinsics using capture_intrinsics.py before the demo.
+
+# ── Deployment / object settings ─────────────────────────────────────────────
+obj_id: 1
+dataset_name: custom
+
+# model_path: ./demo_resources/model_mm_aligned.ply
+model_path: ./demo_resources/cap_obj.ply
+model_texture_path:
+model_scale_to_mm: 1.0
+obj_diameter_mm:
+
+# ── Templates (B2TF DINOv3 retrieval) ────────────────────────────────────────
+templates_dir: ./demo_resources/gigapose_templates/new_templates/level2_icosphere
+
+# ── Camera settings ───────────────────────────────────────────────────────────
+# Run capture_intrinsics.py on the laptop and paste the printed line here.
+camera_intrinsics: "2774.72021484375,2774.81640625,949.345886230469,599.881591796875"
+depth_scale: 1.0
+
+# ── Output ────────────────────────────────────────────────────────────────────
+output_dir: ./demo_results
+log_estimates_csv: false
+results_dir: ./results/demo
+
+# ── DINO model ────────────────────────────────────────────────────────────────
+dino_highlevel_model: dinov3_vitl16
+dinov3_repo_dir: /path/to/your/dinov3  # ← clone facebookresearch/dinov3 and point this here
+dino_patch_use_intermediate_layer: true
+dino_patch_intermediate_layer_idx: 18
+dino_global_layer_idx: 18
+dino_patch_apply_norm: false
+dino_global_apply_norm: false
+
+# ── Template / encoding settings ─────────────────────────────────────────────
+inplane_rotation_angle: 30
+num_high_level_nearest_templates_to_search_for: 1000
+num_high_level_nearest_templates_to_use: 75
+min_rot_dist_between_high_level_neighbors: 20
+high_level_bg_weight: 1.0
+patch_bg_weight: 1.0
+high_level_use_patch_features: true
+high_level_use_attention_weighting: false
+
+# ── Correspondence / RANSAC ───────────────────────────────────────────────────
+num_patch_neighbors_to_search_for: 3
+num_patch_neighbors_to_use: 3
+use_mutual_nearest_neighbor: false
+use_vectorized_correspondences: true
+use_faiss_patch_nn: true
+num_ransac_hypotheses: 3
+ransac_inlier_threshold: 12.0
+min_rot_dist_between_hypotheses: 15
+depth_consistency_reweighting: false
+pose_guided_re_correspondence: false
+pose_guided_sim_threshold: 0.5
+pose_guided_max_spatial_dist: 16.0
+
+# ── Segmentation (B2TF mask handling) ────────────────────────────────────────
+cnos_score_threshold: 0.6
+cnos_num_masks: 5
+mask_erosion_kernel_size: 0
+
+# ── CNOS segmentation (FastSAM + DINOv2) ─────────────────────────────────────
+# Path to directory containing template PNG files for CNOS object detection.
+# These are the black-and-white rendered templates, NOT the B2TF templates above.
+cnos_template_dir: /path/to/your/demo/object/templates/  # ← the live demo's target object's rendered templates (see template_generation/)
+cnos_num_max_dets: 8
+cnos_conf_threshold: 0.30
+
+# ── Hypothesis selection (see MODULARIZATION_PLAN.md, Stage 6) ───────────────
+# "all" = number of real object instances isn't known ahead of time — return
+# one pose per deduped mask instead of truncating to a fixed count (that's
+# what the BOP benchmark path uses num_object_instances: 1 for instead).
+num_object_instances: "all"
+
+# Pose deduplication (drops duplicate CNOS masks of the same instance).
+# Two estimated poses are dropped to one only when BOTH their translation AND
+# rotation are within these thresholds — keeps genuinely distinct, closely-packed
+# instances (occlusion) intact, since those normally still differ in orientation.
+dedup_translation_thresh_mm: 10.0
+dedup_rotation_thresh_deg: 5.0
+
+# ── Depth refiner ─────────────────────────────────────────────────────────────
+depth_refiner: teaserpp
+teaserpp_noise_bound: 0.015
+teaserpp_n_points: 1000
+teaserpp_n_min_points: 50
+teaserpp_min_inliers: 30
+teaserpp_use_fps: false
+
+# ── MegaPose refinement ───────────────────────────────────────────────────────
+refinements:
+  - rgbd_megapose
+megapose_min_correspondences: 15
+
+# ── Geometric template re-ranking ─────────────────────────────────────────────
+use_geometric_template_reranking: false
+geo_reranking_alpha: 0.5
+geo_reranking_proj_radius: 3
+
+# ── Pipeline timing annotation (§8.2 — drawn on the returned overlay PNG) ────
+# Shows "Pose estimation pipeline time: X.XXs" (CNOS + B2TF only, excludes
+# rendering/transfer) baked into the image — set to false to hide it.
+show_pipeline_timing_annotation: false
+
+# ── Visualizations — MUST stay as no_visualization (plt.show blocks server) ──
+visualizations:
+  - no_visualization
+
+# ── Flask server ──────────────────────────────────────────────────────────────
+server_host: "0.0.0.0"
+server_port: 5000

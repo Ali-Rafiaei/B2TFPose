@@ -1,0 +1,59 @@
+# Python 3.10. Pinned from the environment this was developed and verified
+# in (CUDA 13.0, driver 580.17x, RTX 3090) — adjust the torch/torchvision
+# CUDA build for your own system (see the note below), everything else
+# should install as-is.
+
+# --- PyTorch: install the build matching your CUDA version FIRST, from
+# https://pytorch.org/get-started/locally/ — a plain `pip install torch`
+# can silently give you a CPU-only build. Tested against torch==2.9.1+cu130 /
+# torchvision==0.24.1+cu130; version numbers below are CUDA-build-agnostic.
+torch==2.9.1
+torchvision==0.24.1
+
+# --- Core (both RGB/ and RGBD/) ---
+numpy==1.26.0
+opencv-python==4.12.0
+h5py==3.12.1
+scikit-learn==1.5.1
+pandas==2.2.2
+Pillow==11.0.0
+PyYAML==6.0.2
+tqdm==4.67.1
+trimesh==4.6.10
+pyrender==0.1.45
+joblib==1.4.2
+
+# --- Optional, GPU-accelerated kNN (nearest_neighbor_utils.py falls back to
+# scikit-learn automatically if this isn't importable — not a hard
+# requirement). Usually installed via conda, not pip:
+#   conda install -c pytorch faiss-gpu
+# (a faiss-gpu package also exists on PyPI; this was tested against the
+# conda build, version 1.9.0.)
+
+# --- RGBD/ only ---
+open3d==0.18.0
+numba==0.61.2        # RGBD/horn.py's RANSAC-Horn solver
+matplotlib==3.9.2
+seaborn==0.13.2
+scipy==1.13.1
+
+# RGBD/teaserpp_refiner.py — NOT on PyPI, build from source:
+# https://github.com/MIT-SPARK/TEASER-plusplus (tested against
+# teaserpp_python==1.1.0)
+
+# --- RGBD/'s live demo only (live_demo_server.py, live_demo_client.py) ---
+flask==3.0.3
+requests==2.32.3
+# hydra-core/omegaconf: imported directly by live_demo_server.py for CNOS's
+# config loading, not just a transitive cnos/ dependency.
+hydra-core==1.3.2
+omegaconf==2.3.0
+# zivid — the reference live-demo client/capture_intrinsics.py assume a
+# Zivid structured-light camera; requires the Zivid SDK installed first,
+# per Zivid's own instructions, before `pip install zivid` will work
+# (tested against zivid==2.11.1.2.11.1). See the README for writing your
+# own client against the server's hardware-agnostic HTTP API instead.
+
+# --- template_generation/ only (invoked as an external tool via
+# `blenderproc run ...`, never imported into this code) ---
+blenderproc==2.8.0
